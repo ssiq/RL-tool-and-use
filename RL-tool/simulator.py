@@ -7,8 +7,8 @@ class Simulator(object):
 
     def _set_env_and_robot(self):
         self.robot = self.robot \
-            .setActionSpace(self.env.action_space) \
-            .setObservationSpace(self.env.observation_space)
+            .set_action_space(self.env.action_space) \
+            .set_observation_space(self.env.observation_space)
 
     def set_env(self, env):
         self.env = env
