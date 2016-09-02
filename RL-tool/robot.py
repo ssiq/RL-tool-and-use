@@ -1,11 +1,8 @@
+from feature import IdentityFeatureExtractor
+
+
 class Robot(object):
     def __init__(self):
-        pass
-
-    def set_action_space(self, action_space):
-        pass
-
-    def set_observation_space(self, observation_space):
         pass
 
     def response(self, observation):
@@ -20,17 +17,27 @@ class MonteCarloRobot(Robot):
         super(MonteCarloRobot, self).__init__()
         self.value_approximator = value_approximator
 
-    def set_observation_space(self, observation_space):
-        super(MonteCarloRobot, self).set_observation_space(observation_space)
-
     def update(self, observation, reward, done):
         super(MonteCarloRobot, self).update(observation, reward, done)
 
-    def set_action_space(self, action_space):
-        super(MonteCarloRobot, self).set_action_space(action_space)
-
     def response(self, observation):
         super(MonteCarloRobot, self).response(observation)
+
+
+class TDRobot(Robot):
+    def __init__(self, lamda=0, value_approximator=None, feature=IdentityFeatureExtractor()):
+        super(TDRobot, self).__init__()
+        self.lamda = 0
+        self.value_approximator = value_approximator
+        self.feature = feature
+
+    def update(self, observation, reward, done):
+        super(TDRobot, self).update(observation, reward, done)
+
+    def response(self, observation):
+        super(TDRobot, self).response(observation)
+
+
 
 
 
