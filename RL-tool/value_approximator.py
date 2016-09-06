@@ -5,10 +5,10 @@ class ValueApproximator(object):
     def __init__(self):
         pass
 
-    def get_value(self, state):
+    def get_value(self, state, action):
         pass
 
-    def update_value(self, target_value, state):
+    def update_value(self, target_value, state, action):
         pass
 
 
@@ -18,7 +18,8 @@ class TableValueApproximator(ValueApproximator):
         self.table = {}
         self.learning_rate = learning_rate
 
-    def _get_value(self, state):
+    def _get_value(self, state, action):
+        state = (state, action)
         if state in self.table:
             return self.table[state]
         else:
@@ -28,33 +29,33 @@ class TableValueApproximator(ValueApproximator):
         key = (state, action)
         self.table[key] = value
 
-    def update_value(self, target_value, state):
-        super(TableValueApproximator, self).update_value(target_value, state)
-        new_value = self._get_value(state) + \
-                    self.learning_rate * (target_value - self._get_value(state))
-        self._set_value(state, new_value)
+    def update_value(self, target_value, state, action):
+        super(TableValueApproximator, self).update_value(target_value, state, action)
 
-    def get_value(self, state):
-        super(TableValueApproximator, self).get_value(state)
-        return self._get_value(state)
+        new_value = self._get_value(state, action) + \
+                    self.learning_rate * (target_value - self._get_value(state, action))
+        self._set_value(state, action, new_value)
+
+    def get_value(self, state, action):
+        super(TableValueApproximator, self).get_value(state, action)
+        return self._get_value(state, action)
 
 
-class LinearValueApproximator(ValueApproximator):
+class DiscreteLinearValueApproximator(ValueApproximator):
     def __init__(self, learning_rate, shape):
-        super(LinearValueApproximator, self).__init__()
+        super(DiscreteLinearValueApproximator, self).__init__()
         self.shape = shape
         self.w = np.random.randn(*shape)
         self.learning_rate = learning_rate
 
-    def _get_value(self, state):
-        assert state.shape != self.shape, 'state shape not consistent'
-        return np.sum(self.w * state)
+    def _get_value(self, state, action):
+        return self.w[action, :].dot(state.reshape(self.shape[1], -1))
 
-    def update_value(self, target_value, state):
-        super(LinearValueApproximator, self).update_value(target_value, state)
-        self.w = self.learning_rate * (target_value - state) * self.w
+    def update_value(self, target_value, state, action):
+        super(DiscreteLinearValueApproximator, self).update_value(target_value, state, action)
+        self.w = self.learning_rate * (target_value - self._get_value(state, action)) * state
 
-    def get_value(self, state):
-        super(LinearValueApproximator, self).get_value(state)
-        return self._get_value(state)
+    def get_value(self, state, action):
+        super(DiscreteLinearValueApproximator, self).get_value(state, action)
+        return self._get_value(state, action)
 
