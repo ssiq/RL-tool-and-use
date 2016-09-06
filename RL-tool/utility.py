@@ -13,3 +13,8 @@ class ApproximatorAndFearureBuilder(object):
 
     def build(self):
         pass
+
+
+def flip_coin(p):
+    import random
+    return random.random() < p
