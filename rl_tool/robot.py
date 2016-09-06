@@ -27,11 +27,10 @@ class MonteCarloRobot(Robot):
 
 
 class TDZeroRobot(Robot):
-    def __init__(self, action_space, epsilon=0.5, gamma=0, lamda=0, value_approximator=None, feature=IdentityFeatureExtractor()):
+    def __init__(self, action_space, epsilon=0.5, gamma=0, value_approximator=None, feature=IdentityFeatureExtractor()):
         super(TDZeroRobot, self).__init__()
         self.action_space = action_space
         self.epsilon = epsilon
-        self.lamda = lamda
         self.gamma = gamma
         self.value_approximator = value_approximator
         self.feature = feature
@@ -42,7 +41,7 @@ class TDZeroRobot(Robot):
         super(TDZeroRobot, self).update(observation, reward, done)
         features = self.feature.transform(observation)
         next_action = self.response(features)
-        target_value = reward + self.value_approximator.get_value(features, next_action)
+        target_value = reward + self.gamma * self.value_approximator.get_value(features, next_action)
         self.value_approximator.update_value(target_value, self.now_features, self.now_action)
 
     def response(self, observation):

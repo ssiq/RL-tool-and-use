@@ -49,11 +49,11 @@ class DiscreteLinearValueApproximator(ValueApproximator):
         self.learning_rate = learning_rate
 
     def _get_value(self, state, action):
-        return self.w[action, :].dot(state.reshape(self.shape[1], -1))
+        return self.w[action, :].dot(state)
 
     def update_value(self, target_value, state, action):
         super(DiscreteLinearValueApproximator, self).update_value(target_value, state, action)
-        self.w = self.learning_rate * (target_value - self._get_value(state, action)) * state
+        self.w[action, :] = self.learning_rate * (target_value - self._get_value(state, action)) * state
 
     def get_value(self, state, action):
         super(DiscreteLinearValueApproximator, self).get_value(state, action)
