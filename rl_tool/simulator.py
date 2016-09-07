@@ -25,6 +25,7 @@ class Simulator(object):
     def run(self, episode_number=20, max_episode_length=100):
         for i_episode in xrange(episode_number):
             observation = self.env.reset()
+            self.robot.reset()
             for t in xrange(max_episode_length):
                 self.env.render()
                 action = self.robot.response(observation)

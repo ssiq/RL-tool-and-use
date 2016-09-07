@@ -13,6 +13,9 @@ class Robot(object):
     def update(self, observation, reward, done):
         pass
 
+    def reset(self):
+        pass
+
 
 class MonteCarloRobot(Robot):
     def __init__(self, value_approximator=None):
@@ -25,45 +28,75 @@ class MonteCarloRobot(Robot):
     def response(self, observation):
         super(MonteCarloRobot, self).response(observation)
 
+    def reset(self):
+        pass
 
-class TDZeroRobot(Robot):
-    def __init__(self, action_space, epsilon=0.5, gamma=0, value_approximator=None, feature=IdentityFeatureExtractor()):
-        super(TDZeroRobot, self).__init__()
+
+class QRobot(Robot):
+    def __init__(self, action_space, epsilon=0.5, gamma=0, value_approximator=None,
+                 feature=IdentityFeatureExtractor(), verbose=False,
+                 epsilon_delta=0.01, replay=0):
+        super(QRobot, self).__init__()
         self.action_space = action_space
         self.epsilon = epsilon
         self.gamma = gamma
         self.value_approximator = value_approximator
         self.feature = feature
+        self.verbose = False
         self.now_features = None
         self.now_action = None
+        self.epsilon_delta = epsilon_delta
+        self.replay = replay
+        self.memory = []
+
+    def reset(self):
+        self.now_action = None
+        self.now_features = None
+
+    def _best_action(self, features):
+        best_value = None
+        best_action = None
+        for i in xrange(self.action_space):
+            if best_value is None:
+                best_value = self.value_approximator.get_value(features, i)
+                best_action = i
+            else:
+                value = self.value_approximator.get_value(features, i)
+                if value > best_value:
+                    best_value = value
+                    best_action = i
+        return best_action
+
+    def _update(self, features, action, reward, next_features, done):
+        next_action = self._best_action(next_features)
+        if not done:
+            target_value = reward + self.gamma * self.value_approximator.get_value(next_features, next_action)
+        else:
+            target_value = reward
+        self.value_approximator.update_value(target_value, features, action)
 
     def update(self, observation, reward, done):
-        super(TDZeroRobot, self).update(observation, reward, done)
+        super(QRobot, self).update(observation, reward, done)
         features = self.feature.transform(observation)
-        next_action = self.response(features)
-        target_value = reward + self.gamma * self.value_approximator.get_value(features, next_action)
-        self.value_approximator.update_value(target_value, self.now_features, self.now_action)
+        if self.replay:
+            self.memory.append((self.now_features, self.now_action, reward, features, done))
+        self._update(self.now_features, self.now_action, reward, features, done)
+        if reward > 0:
+            self.epsilon = max(self.epsilon-self.epsilon_delta, 0.01)
+        if self.replay and len(self.memory) > self.replay:
+            for i in xrange(self.replay):
+                features, action, reward, next_features, done = random.choice(self.memory)
+                self._update(features, action, reward, next_features, done)
 
     def response(self, observation):
-        super(TDZeroRobot, self).response(observation)
+        super(QRobot, self).response(observation)
         features = self.feature.transform(observation)
         self.now_features = features
 
         if flip_coin(self.epsilon):
             self.now_action = random.randint(0, self.action_space-1)
         else:
-            best_value = None
-            best_action = None
-            for i in xrange(self.action_space):
-                if best_value is None:
-                    best_value = self.value_approximator.get_value(features, i)
-                    best_action = i
-                else:
-                    value = self.value_approximator.get_value(features, i)
-                    if value > best_value:
-                        best_value = value
-                        best_action = i
-            self.now_action = best_action
+            self.now_action = self._best_action(features)
         return self.now_action
 
 

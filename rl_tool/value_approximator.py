@@ -47,13 +47,19 @@ class DiscreteLinearValueApproximator(ValueApproximator):
         self.shape = shape
         self.w = np.random.randn(*shape)
         self.learning_rate = learning_rate
+        self.itr = 0
 
     def _get_value(self, state, action):
         return self.w[action, :].dot(state)
 
     def update_value(self, target_value, state, action):
         super(DiscreteLinearValueApproximator, self).update_value(target_value, state, action)
-        self.w[action, :] = self.learning_rate * (target_value - self._get_value(state, action)) * state
+        self.itr += 1
+        if self.itr%1000 == 0:
+            print 'targe:{}, approximate:{},delta:{}'.format(target_value, self._get_value(state, action),
+                                                             target_value - self._get_value(state, action))
+            # self.learning_rate /= 2.0
+        self.w[action, :] -= self.learning_rate * (target_value - self._get_value(state, action)) * state
 
     def get_value(self, state, action):
         super(DiscreteLinearValueApproximator, self).get_value(state, action)
