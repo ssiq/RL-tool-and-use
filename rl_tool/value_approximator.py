@@ -55,11 +55,11 @@ class DiscreteLinearValueApproximator(ValueApproximator):
     def update_value(self, target_value, state, action):
         super(DiscreteLinearValueApproximator, self).update_value(target_value, state, action)
         self.itr += 1
-        if self.itr%1000 == 0:
+        if self.itr%10000 == 0:
             print 'targe:{}, approximate:{},delta:{}'.format(target_value, self._get_value(state, action),
                                                              target_value - self._get_value(state, action))
-            # self.learning_rate /= 2.0
-        self.w[action, :] -= self.learning_rate * (target_value - self._get_value(state, action)) * state
+            self.learning_rate /= 2.0
+        self.w[action, :] += self.learning_rate * (target_value - self._get_value(state, action)) * state
 
     def get_value(self, state, action):
         super(DiscreteLinearValueApproximator, self).get_value(state, action)
