@@ -90,7 +90,7 @@ class NetworkApproximater(ValueApproximator):
         train_y = []
         for target_value, state, action in exprience_list:
             train_X.append(state)
-            y = np.zeros((self.action_number, ))
+            y = self.network.predict(np.array([state]))[0]
             y[action] = target_value
             train_y.append(y)
         train_X = np.array(train_X)
