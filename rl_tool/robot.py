@@ -35,7 +35,7 @@ class MonteCarloRobot(Robot):
 class QRobot(Robot):
     def __init__(self, action_space, epsilon=0.5, gamma=0, value_approximator=None,
                  feature=IdentityFeatureExtractor(), verbose=False,
-                 epsilon_delta=0.01, replay=0, batch_replay=False):
+                 epsilon_delta=0.01, replay=0, batch_replay=False, max_memory_size=1000):
         super(QRobot, self).__init__()
         self.action_space = action_space
         self.epsilon = epsilon
@@ -48,7 +48,10 @@ class QRobot(Robot):
         self.epsilon_delta = epsilon_delta
         self.replay = replay
         self.batch_replay = batch_replay
+        self.max_memory_size = max_memory_size
+        self.delete_one_time = 100
         self.memory = []
+        self.verbose = verbose
 
     def reset(self):
         self.now_action = None
@@ -92,14 +95,16 @@ class QRobot(Robot):
         features = self.feature.transform(observation)
         if self.replay:
             self.memory.append((self.now_features, self.now_action, reward, features, done))
-        if not self.batch_replay:
-            self._update(self.now_features, self.now_action, reward, features, done)
-        if reward > 0:
+            if len(self.memory) > self.max_memory_size + self.delete_one_time:
+                self.memory = self.memory[:self.delete_one_time]
+
+        self._update(self.now_features, self.now_action, reward, features, done)
+        if done:
             self.epsilon = max(self.epsilon-self.epsilon_delta, 0.01)
-        if self.replay and len(self.memory) > self.replay:
+        if self.replay and len(self.memory) > self.replay and len(self.memory) > self.batch_replay:
             if self.batch_replay:
                 for i in xrange(self.replay):
-                    self._batch_update(random.sample(self.memory, self.replay))
+                    self._batch_update(random.sample(self.memory, self.batch_replay))
             else:
                 for i in xrange(self.replay):
                     features, action, reward, next_features, done = random.choice(self.memory)

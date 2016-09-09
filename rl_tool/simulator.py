@@ -32,5 +32,6 @@ class Simulator(object):
                 observation, reward, done, info = self.env.step(action)
                 self.robot.update(observation, reward, done)
                 if done:
-                    print("Episode finished after {} timesteps".format(t + 1))
+                    print("Episode {} finished after {} timesteps with epsilon {}".
+                          format(i_episode, t + 1, self.robot.epsilon))
                     break

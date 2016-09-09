@@ -75,9 +75,17 @@ class NetworkApproximater(ValueApproximator):
         super(NetworkApproximater, self).__init__()
         self.network = network
         self.action_number = action_number
+        self.itr = 0
+
+    def _generate_state(self, state, action):
+        state = state.reshape(-1)
+        s = np.zeros((state.shape[0] * self.action_number, ))
+        s[action * self.action_number:action * self.action_number+state.shape[0]] = state[:]
+        return s
 
     def _get_value(self, state, action):
-        return self.network.predict(np.array([state]))[0][action]
+        state = self._generate_state(state, action)
+        return self.network.predict(np.array([state]))[0][0]
 
     def get_value(self, state, action):
         return self._get_value(state, action)
@@ -86,15 +94,20 @@ class NetworkApproximater(ValueApproximator):
         self.batch_update_value([(target_value, state, action)])
 
     def batch_update_value(self, exprience_list):
+        self.itr += 1
         train_X = []
         train_y = []
         for target_value, state, action in exprience_list:
-            train_X.append(state)
-            y = self.network.predict(np.array([state]))[0]
-            y[action] = target_value
-            train_y.append(y)
+            train_X.append(self._generate_state(state, action))
+            # y = self.network.predict(np.array([state]))[0]
+            # y[action] = target_value
+            train_y.append(target_value)
         train_X = np.array(train_X)
         train_y = np.array(train_y)
-        print 'begin to fit network'
-        self.network.fit(train_X, train_y, nb_epoch=1, batch_size=len(exprience_list))
-        print 'end to fit network'
+        # print 'begin to fit network'
+        if self.itr % 1000 == 0:
+            verbose = 1
+        else:
+            verbose = 0
+        self.network.fit(train_X, train_y, nb_epoch=1, batch_size=len(exprience_list), verbose=verbose)
+        # print 'end to fit network'
