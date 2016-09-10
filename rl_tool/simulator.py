@@ -26,12 +26,15 @@ class Simulator(object):
         for i_episode in xrange(episode_number):
             observation = self.env.reset()
             self.robot.reset()
+            total_reward = 0.0
             for t in xrange(max_episode_length):
                 self.env.render()
                 action = self.robot.response(observation)
                 observation, reward, done, info = self.env.step(action)
                 self.robot.update(observation, reward, done)
+                total_reward += reward
                 if done:
-                    print("Episode {} finished after {} timesteps with epsilon {}".
-                          format(i_episode, t + 1, self.robot.epsilon))
+                    print("Episode {} finished after {} timesteps with epsilon {} and reward {}".
+                          format(i_episode, t + 1, self.robot.epsilon, total_reward))
+                    total_reward = 0.0
                     break

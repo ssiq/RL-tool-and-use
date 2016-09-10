@@ -105,9 +105,5 @@ class NetworkApproximater(ValueApproximator):
         train_X = np.array(train_X)
         train_y = np.array(train_y)
         # print 'begin to fit network'
-        if self.itr % 1000 == 0:
-            verbose = 1
-        else:
-            verbose = 0
-        self.network.fit(train_X, train_y, nb_epoch=1, batch_size=len(exprience_list), verbose=verbose)
+        self.network.train_on_batch(train_X, train_y)
         # print 'end to fit network'
