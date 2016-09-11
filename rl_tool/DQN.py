@@ -76,7 +76,7 @@ class DQN(Robot):
             loss.append(self._train(batch))
             batch = self.replay_memory.sample(self.batch_size)
 
-            if self.step_no % self.C == 0:
+            if self.C > 1 and self.step_no % self.C == 0:
                 self.target_network = copy.deepcopy(self.network)
 
         self.loss_list.append(np.array(loss).mean())
