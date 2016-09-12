@@ -13,8 +13,8 @@ if __name__ == '__main__':
     network = Sequential([
         Dense(input_dim=input_number, output_dim=8),
         Activation('relu'),
-        Dense(16),
-        Activation('relu'),
+        # Dense(16),
+        # Activation('relu'),
         Dense(action_number),
         Activation('linear')
     ])
@@ -24,4 +24,4 @@ if __name__ == '__main__':
     replay_memory = ProritizedMemory(100, 10000)
     robot = DQN(network, action_number, C=1, replay_memory=replay_memory, batch_size=20, epsilon_delta=0.002)
     simulator = Simulator(env, robot, verbose=True)
-    simulator.run(episode_number=10000, max_episode_length=200)
+    simulator.run(episode_number=10000, max_episode_length=500)
