@@ -84,6 +84,7 @@ class DQN(Robot):
             print 'This Episode\'s mean loss: {}'.format(np.array(self.loss_list).mean())
             self.loss_list = []
             self.epsilon = max(self.epsilon - self.epsilon_delta, self.end_epsilon)
+        return np.array(self.loss_list).mean()
 
 
 
