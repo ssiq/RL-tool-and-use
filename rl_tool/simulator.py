@@ -53,5 +53,5 @@ class Simulator(object):
             reward_list.append(total_reward)
             loss_list.append(np.array(loss_list).mean())
         if self.save_path is not None:
-            plot_lines([(xrange(1, len(reward_list)+1), reward_list), (xrange(1, len(loss_list)), loss_list)],
+            plot_lines([(xrange(1, len(reward_list)+1), reward_list), (xrange(1, len(loss_list)+1), loss_list)],
                        ['reward', 'loss'], self.save_path)

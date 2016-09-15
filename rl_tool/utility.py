@@ -1,5 +1,5 @@
-import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 
 class ApproximatorAndFearureBuilder(object):
@@ -24,13 +24,15 @@ def flip_coin(p):
     return random.random() < p
 
 
-def plot_lines(line_list, label_list, path):
+def plot_lines(line_list, label_list, path=None, colormap_name='gist_earth'):
     plt.ioff()
     f = plt.figure()
-    line_list = []
-    for line, label in zip(line_list, label_list):
-        line_list.append(plt.plot(line[0], line[1], label=label))
-    plt.legend(line_list)
+    lines_list = []
+    color_map = cm.get_cmap(colormap_name)
+    for line, i in zip(line_list, xrange(len(line_list))):
+        t, = plt.plot(line[0], line[1], color=color_map(i))
+        lines_list.append(t)
+    plt.legend(lines_list, label_list)
     if path is None:
         plt.show()
     else:
