@@ -70,7 +70,7 @@ class GaussLinearCERobot(CERobot):
     def __init__(self, action_space, input_space, mean, covariance_matrix,
                  noise_begin=0, noise_delta=0, try_number=10, ru=0.9):
         self.action_space = action_space
-        self.input_shape = input_space
+        self.input_space = input_space
         self.noise = noise_begin
         self.noise_delta = noise_delta
         self.mean = mean
@@ -83,10 +83,10 @@ class GaussLinearCERobot(CERobot):
 
     def _update_parameter(self, weight_score_list):
         self.noise = max(self.noise - self.noise_delta, 0.0)
-        weights = np.array([a for a, _ in weight_score_list])
+        weights = np.array([a.reshape(-1) for a, _ in weight_score_list])
         self.mean = weights.mean(axis=0)
-        self.covariance_matrix = weights.T.dot(weights)/len(weight_score_list) + self.noise
+        self.covariance_matrix = (weights - self.mean).T.dot(weights-self.mean)/len(weight_score_list) + self.noise
 
     def _sample_weight(self):
         from numpy.random import multivariate_normal
-        return multivariate_normal(self.mean, self.covariance_matrix)
+        return multivariate_normal(self.mean, self.covariance_matrix).reshape(self.action_space, self.input_space)

@@ -27,7 +27,7 @@ class Simulator(object):
         #     self._set_env_and_robot()
         return self
 
-    def run(self, episode_number=20, max_episode_length=100, done_reward=-1):
+    def run(self, episode_number=20, max_episode_length=100, done_reward=-1, has_loss=True):
         reward_list = []
         loss_list = []
         for i_episode in xrange(episode_number):
@@ -40,18 +40,20 @@ class Simulator(object):
                 action = self.robot.response(observation)
                 observation, reward, done, info = self.env.step(action)
                 total_reward += reward
-                if done:
-                    losses.append(self.robot.update(observation, done_reward, done))
-                    print("Episode {} finished after {} timesteps with epsilon {} and reward {}".
-                          format(i_episode, t + 1, self.robot.epsilon, total_reward))
+                if done or t == max_episode_length-1:
+                    losses.append(self.robot.update(observation, done_reward, True))
+                    print("Episode {} finished after {} timesteps with reward {}".
+                          format(i_episode, t + 1, total_reward))
                     break
                 else:
                     losses.append(self.robot.update(observation, reward, done))
-            else:
-                print("Episode {} finished after {} timesteps with epsilon {} and reward {}".
-                      format(i_episode, max_episode_length, self.robot.epsilon, total_reward))
             reward_list.append(total_reward)
-            loss_list.append(np.array(loss_list).mean())
+            if has_loss:
+                loss_list.append(np.array(loss_list).mean())
         if self.save_path is not None:
-            plot_lines([(xrange(1, len(reward_list)+1), reward_list), (xrange(1, len(loss_list)+1), loss_list)],
-                       ['reward', 'loss'], self.save_path)
+            lines = [(xrange(1, len(reward_list)+1), reward_list)]
+            labels = ['reward']
+            if has_loss:
+                lines.append((xrange(1, len(loss_list)+1), loss_list))
+                labels.append('loss')
+            plot_lines(lines, labels, self.save_path)
