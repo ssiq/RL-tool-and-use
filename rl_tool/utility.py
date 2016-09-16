@@ -24,11 +24,11 @@ def flip_coin(p):
     return random.random() < p
 
 
-def plot_lines(line_list, label_list, path=None, colormap_name='gist_earth'):
+def plot_lines(line_list, label_list, path=None, colormap_name='gist_ncar', lut=5):
     plt.ioff()
     f = plt.figure()
     lines_list = []
-    color_map = cm.get_cmap(colormap_name)
+    color_map = cm.get_cmap(colormap_name, lut)
     for line, i in zip(line_list, xrange(len(line_list))):
         t, = plt.plot(line[0], line[1], color=color_map(i))
         lines_list.append(t)
