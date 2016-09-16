@@ -1,4 +1,5 @@
 from robot import Robot
+import numpy as np
 
 
 class CERobot(Robot):
@@ -63,3 +64,29 @@ class CERobot(Robot):
 
     def reset(self):
         super(CERobot, self).reset()
+
+
+class GaussLinearCERobot(CERobot):
+    def __init__(self, action_space, input_space, mean, covariance_matrix,
+                 noise_begin=0, noise_delta=0, try_number=10, ru=0.9):
+        self.action_space = action_space
+        self.input_shape = input_space
+        self.noise = noise_begin
+        self.noise_delta = noise_delta
+        self.mean = mean
+        self.covariance_matrix = covariance_matrix
+        super(GaussLinearCERobot, self).__init__(try_number, ru)
+
+    def _get_action(self, observation, weight):
+        observation = observation.reshape(-1)
+        return np.argmax(weight.dot(observation))
+
+    def _update_parameter(self, weight_score_list):
+        self.noise = max(self.noise - self.noise_delta, 0.0)
+        weights = np.array([a for a, _ in weight_score_list])
+        self.mean = weights.mean(axis=0)
+        self.covariance_matrix = weights.T.dot(weights)/len(weight_score_list) + self.noise
+
+    def _sample_weight(self):
+        from numpy.random import multivariate_normal
+        return multivariate_normal(self.mean, self.covariance_matrix)
