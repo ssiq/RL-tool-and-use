@@ -47,13 +47,15 @@ class CERobot(Robot):
         self.now_score += reward
         if done:
             self.now_number += 1
-            self.weight_score_list.append((self.now_weight, self.now_number))
+            self.weight_score_list.append((self.now_weight, self.now_score))
             self.now_weight = self._sample_weight()
             self.now_score = 0
 
         if self.now_number == self.try_number:
             left_number = int(self.try_number * self.ru)
-            ws_l = sorted(self.weight_score_list, lambda x, y: cmp(x[1], y[1]))[:-left_number]
+            ws_l = sorted(self.weight_score_list, lambda x, y: cmp(x[1], y[1]))[-left_number:]
+            print self.weight_score_list
+            print ws_l
             self._update_parameter(ws_l)
             self.weight_score_list = []
             self.now_weight = self._sample_weight()
