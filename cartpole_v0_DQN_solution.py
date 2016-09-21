@@ -14,10 +14,6 @@ if __name__ == '__main__':
     network = Sequential([
         Dense(input_dim=input_number, output_dim=8),
         Activation('relu'),
-        Dropout(0.5),
-        Dense(16),
-        Activation('relu'),
-        Dropout(0.5),
         Dense(action_number),
         Activation('linear')
     ])
