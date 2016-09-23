@@ -27,7 +27,7 @@ if __name__ == '__main__':
     rmsprop = RMSprop(lr=0.001)
     sgd = SGD(clipnorm=1, momentum=0.5)
     network.compile(optimizer='adam', loss='mse')
-    replay_memory = NormalMemory(100, 100000)
+    replay_memory = NormalMemory(100, 200)
     robot = DQN(network, action_number, C=2, replay_memory=replay_memory, batch_size=20,
                 epsilon_delta=0.001, replay_times=10)
     simulator = Simulator(env, robot, verbose=True, save_path='register/DQN/MountainCar-v0.jpg')
