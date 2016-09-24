@@ -33,34 +33,43 @@ class DQN(Robot):
         super(DQN, self).reset()
 
     def _predict(self, features):
-        return self.network.predict(np.array([features]))[0]
+        return self.network.predict(features)
 
     def _predict_target(self, features):
-        return self.target_network.predict(np.array([features]))[0]
+        return self.target_network.predict(features)
 
     def response(self, observation):
         features = self.feature.transform(observation)
         if flip_coin(self.epsilon):
             action = random.choice(range(0, self.action_number))
         else:
-            action = np.argmax(self._predict(features))
+            action = np.argmax(self._predict(np.array([features]))[0])
         self.old_features = features
         self.old_action = action
         return action
 
     def _train(self, batch):
         train_X = []
-        train_y = []
+        action_list = []
+        now_features_list = []
+        done_list = []
+        reward_list = []
         for old_features, action, now_features, reward, done in batch:
-            target = self._predict(old_features)
-            if not done:
-                target[action] = reward + self.gamma * np.max(self._predict_target(now_features))
-            else:
-                target[action] = reward
-            train_y.append(target)
+            action_list.append(action)
+            now_features_list.append(now_features)
+            done_list.append(done)
+            reward_list.append(reward)
             train_X.append(old_features)
         train_X = np.array(train_X)
-        train_y = np.array(train_y)
+        action_list = np.array(action_list)
+        now_features_list = np.array(now_features_list)
+        done_list = np.array(done_list)
+        reward_list = np.array(reward_list)
+        target = self._predict(train_X)
+        target[range(self.batch_size), action_list] \
+            = reward_list + \
+              self.gamma * np.max(self._predict_target(now_features_list), axis=1) * done_list
+        train_y = target
         return self.network.train_on_batch(train_X, train_y)
 
     def update(self, observation, reward, done):

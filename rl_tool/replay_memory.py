@@ -1,5 +1,7 @@
 import random
 import heapq
+import numpy as np
+from collections import deque
 
 
 class ReplayMemory(object):
@@ -14,7 +16,8 @@ class NormalMemory(ReplayMemory):
     def __init__(self, start_size, max_size):
         self.start_size = start_size
         self.max_size = max_size
-        self.memory = []
+        self.memory = deque()
+        # self.permute_memory = None
 
     def sample(self, size):
         if len(self.memory) > self.start_size:
@@ -25,7 +28,30 @@ class NormalMemory(ReplayMemory):
     def add_sample(self, action_tuple, done):
         self.memory.append(action_tuple)
         if len(self.memory) > self.max_size:
-            self.memory.pop(0)
+            self.memory.popleft()
+        # if done:
+        #     self.permute_memory = np.random.permutation(np.array(self.memory))
+
+
+class OneEndMemory(NormalMemory):
+    def __init__(self, start_size, max_size):
+        super(OneEndMemory, self).__init__(start_size, max_size)
+        self.end_sample = None
+
+    def sample(self, size):
+        if self.end_sample is None:
+            return super(OneEndMemory, self).sample(size)
+        else:
+            r = super(OneEndMemory, self).sample(size)
+            if r is not None:
+                r.append(self.end_sample)
+            return r
+
+    def add_sample(self, action_tuple, done):
+        if done:
+            self.end_sample = action_tuple
+        else:
+            super(OneEndMemory, self).add_sample(action_tuple, done)
 
 
 class ProritizedMemory(ReplayMemory):
