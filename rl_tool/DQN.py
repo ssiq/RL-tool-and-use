@@ -48,7 +48,7 @@ class DQN(Robot):
         self.old_action = action
         return action
 
-    def _train(self, batch):
+    def unpack_patch(self, batch):
         train_X = []
         action_list = []
         now_features_list = []
@@ -65,8 +65,12 @@ class DQN(Robot):
         now_features_list = np.array(now_features_list)
         done_list = np.array(done_list)
         reward_list = np.array(reward_list)
+        return train_X, action_list, now_features_list, done_list, reward_list
+
+    def _train(self, batch):
+        train_X, action_list, now_features_list, done_list, reward_list = self.unpack_patch(batch)
         target = self._predict(train_X)
-        target[range(self.batch_size), action_list] \
+        target[xrange(self.batch_size), action_list] \
             = reward_list + \
               self.gamma * np.max(self._predict_target(now_features_list), axis=1) * done_list
         train_y = target
@@ -96,4 +100,19 @@ class DQN(Robot):
         return np.array(self.loss_list).mean()
 
 
+class DoubleDQN(DQN):
+    def __init__(self, network, action_number, C, replay_memory, batch_size=32, replay_times=1, gamma=0.99,
+                 start_epsilon=1.0, end_epsilon=0.01, epsilon_delta=0.002, feature=IdentityFeatureExtractor()):
+        super(DoubleDQN, self).__init__(network, action_number, C, replay_memory, batch_size, replay_times, gamma,
+                                        start_epsilon, end_epsilon, epsilon_delta, feature)
+
+    def _train(self, batch):
+        train_X, action_list, now_features_list, done_list, reward_list = self.unpack_patch(batch)
+        target = self._predict(train_X)
+        next_Q = self._predict(now_features_list)
+        target[xrange(self.batch_size), action_list] \
+            = reward_list \
+              + self.gamma * \
+                self._predict_target(now_features_list)[xrange(self.batch_size), np.argmax(next_Q, axis=1)] * done_list
+        return self.network.train_on_batch(train_X, target)
 
