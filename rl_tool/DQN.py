@@ -67,6 +67,7 @@ class DQN(Robot):
         reward_list = np.array(reward_list)
         return train_X, action_list, now_features_list, done_list, reward_list
 
+    @profile
     def _train(self, batch):
         train_X, action_list, now_features_list, done_list, reward_list = self.unpack_patch(batch)
         target = self._predict(train_X)

@@ -24,11 +24,11 @@ if __name__ == '__main__':
         Dense(action_number),
         Activation('linear')
     ])
-    rmsprop = RMSprop(lr=0.001)
+    rmsprop = RMSprop()
     sgd = SGD(clipnorm=1, momentum=0.5)
     network.compile(optimizer=rmsprop, loss='mse')
     replay_memory = NormalMemory(600, 10000)
     robot = DQN(network, action_number, C=2, replay_memory=replay_memory, batch_size=32,
                 epsilon_delta=0.001, replay_times=2)
     simulator = Simulator(env, robot, verbose=True, save_path='register/DQN/MountainCar-v0.jpg')
-    simulator.run(episode_number=1000, max_episode_length=200)
+    simulator.run(episode_number=10, max_episode_length=200)
