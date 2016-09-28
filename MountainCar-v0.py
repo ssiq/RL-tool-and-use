@@ -31,4 +31,4 @@ if __name__ == '__main__':
     robot = DQN(network, action_number, C=2, replay_memory=replay_memory, batch_size=32,
                 epsilon_delta=0.001, replay_times=2)
     simulator = Simulator(env, robot, verbose=True, save_path='register/DQN/MountainCar-v0.jpg')
-    simulator.run(episode_number=10, max_episode_length=200)
+    simulator.run(episode_number=5, max_episode_length=200)

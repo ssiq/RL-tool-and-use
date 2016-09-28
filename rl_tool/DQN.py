@@ -28,6 +28,8 @@ class DQN(Robot):
         self.replay_times = replay_times
         self.step_no = 0
         self.loss_list = []
+        self.itr_num = 0
+        self.train_freq = 10
 
     def reset(self):
         super(DQN, self).reset()
@@ -67,13 +69,13 @@ class DQN(Robot):
         reward_list = np.array(reward_list)
         return train_X, action_list, now_features_list, done_list, reward_list
 
-    @profile
+    # @profile
     def _train(self, batch):
         train_X, action_list, now_features_list, done_list, reward_list = self.unpack_patch(batch)
         target = self._predict(train_X)
         target[xrange(self.batch_size), action_list] \
             = reward_list + \
-              self.gamma * np.max(self._predict_target(now_features_list), axis=1) * done_list
+              self.gamma * np.max(self._predict_target(now_features_list), axis=1) * (~done_list)
         train_y = target
         return self.network.train_on_batch(train_X, train_y)
 
@@ -83,22 +85,23 @@ class DQN(Robot):
         batch = self.replay_memory.sample(self.batch_size)
         if batch is None:
             return
+        self.itr_num += 1
+        if self.itr_num % self.train_freq == 0:
+            loss = []
+            for i in xrange(self.replay_times):
+                self.step_no += 1
+                loss.append(self._train(batch))
+                batch = self.replay_memory.sample(self.batch_size)
 
-        loss = []
-        for i in xrange(self.replay_times):
-            self.step_no += 1
-            loss.append(self._train(batch))
-            batch = self.replay_memory.sample(self.batch_size)
+                if self.C > 1 and self.step_no % self.C == 0:
+                    self.target_network = copy.deepcopy(self.network)
 
-            if self.C > 1 and self.step_no % self.C == 0:
-                self.target_network = copy.deepcopy(self.network)
-
-        self.loss_list.append(np.array(loss).mean())
-        if done:
-            print 'This Episode\'s mean loss: {}'.format(np.array(self.loss_list).mean())
-            self.loss_list = []
-            self.epsilon = max(self.epsilon - self.epsilon_delta, self.end_epsilon)
-        return np.array(self.loss_list).mean()
+            self.loss_list.append(np.array(loss).mean())
+            if done:
+                print 'This Episode\'s mean loss: {}'.format(np.array(self.loss_list).mean())
+                self.loss_list = []
+                self.epsilon = max(self.epsilon - self.epsilon_delta, self.end_epsilon)
+            return np.array(self.loss_list).mean()
 
 
 class DoubleDQN(DQN):
@@ -114,6 +117,7 @@ class DoubleDQN(DQN):
         target[xrange(self.batch_size), action_list] \
             = reward_list \
               + self.gamma * \
-                self._predict_target(now_features_list)[xrange(self.batch_size), np.argmax(next_Q, axis=1)] * done_list
+                self._predict_target(now_features_list)[xrange(self.batch_size), np.argmax(next_Q, axis=1)] \
+                * (~done_list)
         return self.network.train_on_batch(train_X, target)
 
