@@ -85,23 +85,23 @@ class DQN(Robot):
         batch = self.replay_memory.sample(self.batch_size)
         if batch is None:
             return
-        self.itr_num += 1
-        if self.itr_num % self.train_freq == 0:
-            loss = []
-            for i in xrange(self.replay_times):
-                self.step_no += 1
-                loss.append(self._train(batch))
-                batch = self.replay_memory.sample(self.batch_size)
+        # self.itr_num += 1
+        # if self.itr_num % self.train_freq == 0:
+        loss = []
+        for i in xrange(self.replay_times):
+            self.step_no += 1
+            loss.append(self._train(batch))
+            batch = self.replay_memory.sample(self.batch_size)
 
-                if self.C > 1 and self.step_no % self.C == 0:
-                    self.target_network = copy.deepcopy(self.network)
+            if self.C > 1 and self.step_no % self.C == 0:
+                self.target_network = copy.deepcopy(self.network)
 
-            self.loss_list.append(np.array(loss).mean())
-            if done:
-                print 'This Episode\'s mean loss: {}'.format(np.array(self.loss_list).mean())
-                self.loss_list = []
-                self.epsilon = max(self.epsilon - self.epsilon_delta, self.end_epsilon)
-            return np.array(self.loss_list).mean()
+        self.loss_list.append(np.array(loss).mean())
+        if done:
+            print 'This Episode\'s mean loss: {}'.format(np.array(self.loss_list).mean())
+            self.loss_list = []
+            self.epsilon = max(self.epsilon - self.epsilon_delta, self.end_epsilon)
+        return np.array(self.loss_list).mean()
 
 
 class DoubleDQN(DQN):
