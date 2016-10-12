@@ -69,14 +69,21 @@ class CERobot(Robot):
 
 
 class GaussLinearCERobot(CERobot):
-    def __init__(self, action_space, input_space, mean, covariance_matrix,
+    def __init__(self, action_space, input_space, mean=None, covariance_matrix=None,
                  noise_begin=0, noise_delta=0, try_number=10, ru=0.9):
         self.action_space = action_space
         self.input_space = input_space
         self.noise = noise_begin
         self.noise_delta = noise_delta
-        self.mean = mean
-        self.covariance_matrix = covariance_matrix
+        if mean is None:
+            self.mean = np.random.randn(input_space*action_space)
+        else:
+            self.mean = mean
+
+        if covariance_matrix is None:
+            self.covariance_matrix = np.random.randn(input_space*action_space, input_space*action_space)
+        else:
+            self.covariance_matrix = covariance_matrix
         super(GaussLinearCERobot, self).__init__(try_number, ru)
 
     def _get_action(self, observation, weight):
