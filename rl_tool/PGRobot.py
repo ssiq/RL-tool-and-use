@@ -65,13 +65,15 @@ class MonteCarloPGRobot(PGRobot):
                 reward_list = np.concatenate(reward_list)
                 self.policy_network.train_by_grad(np.array(self.input_batch_memory),
                                                   np.array(self.action_batch_memory),
-                                                  reward_list)
-                reward_list = [reward[0] for reward in self.reward_batch_memory]
+                                                  (reward_list-np.mean(reward_list))/(np.std(reward_list)+1e-6))
+                reward_ori_list = [reward[0] for reward in self.reward_batch_memory]
                 print ''
                 print '-----------------------------------'
                 print 'Iteration {}'.format(self.iteration_time)
-                print 'mean reward {}'.format(np.mean(reward_list))
-                print 'max reward {}'.format(np.max(reward_list))
+                print 'mean reward {}'.format(np.mean(reward_ori_list))
+                print 'max reward {}'.format(np.max(reward_ori_list))
+                print 'mean normal reward {}'.format(np.mean(reward_list))
+                print 'max normal reward {}'.format(np.max(reward_list))
                 print 'episode number {}'.format(len(self.reward_batch_memory))
 
                 self.input_batch_memory = []

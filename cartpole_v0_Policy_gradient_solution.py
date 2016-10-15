@@ -10,7 +10,7 @@ from rl_tool.PGRobot import DiscreteMonteCarloPGRobot
 from rl_tool.simulator import Simulator
 
 def rmsprop(loss, params, learning_rate=1.0, rho=0.9, epsilon=1e-9):
-    updates = OrderedDict()
+    updates = []
     grads = theano.grad(loss, params)
 
     for param, grad in zip(params, grads):
@@ -18,9 +18,9 @@ def rmsprop(loss, params, learning_rate=1.0, rho=0.9, epsilon=1e-9):
         accu = theano.shared(np.zeros(value.shape, dtype=value.dtype),
                              broadcastable=param.broadcastable)
         accu_new = rho * accu + (1 - rho) * grad ** 2
-        updates[accu] = accu_new
-        updates[param] = param + (learning_rate * grad /
-                                  T.sqrt(accu_new + epsilon))
+        updates.append((accu, accu_new))
+        updates.append((param, param + (learning_rate * grad /
+                                T.sqrt(accu_new + epsilon))))
 
     return updates
 
