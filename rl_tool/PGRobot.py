@@ -126,8 +126,9 @@ class DDPG(PGRobot):
         self.batch_size = batch_size
         self.gamma = gamma
         self.tao = tao
-        self.state_input_var, self.action_input_var = T.matrices('policy_input', 'Qvalue_input')
-        self.policy_network, self.Qvalue_network = self._build_network(input_shape, output_shape, self.input_var)
+        self.state_input_var, self.action_input_var = T.matrices('policy_input', 'action_input')
+        self.policy_network, self.Qvalue_network = \
+            self._build_network(input_shape, output_shape, self.state_input_var, self.action_input_var)
         self.target_policy_network = copy.deepcopy(self.policy_network)
         self.target_Qvalue_network = copy.deepcopy(self.Qvalue_network)
         self.input_shape = input_shape
@@ -137,11 +138,27 @@ class DDPG(PGRobot):
         (self.policy_predict_function, self.Qvalue_predict_function), \
         (self.target_policy_predict_function, self.target_Qvalue_predict_function) = \
             build_predict([(self.policy_network, self.Qvalue_network), (self.target_policy_network, self.target_Qvalue_network)])
+        self.Qvalue_update_function, self.policy_update_function = \
+            self._build_grad_function(self.state_input_var, self.action_input_var)
 
     def _build_grad_function(self, state_input_var, action_input_var):
-        actions, next_states = T.matrices('actions', 'next_states')
-        dones = T.bmatrix('dones')
-
+        target = T.matrix('target')
+        Qvalue_predict = lasagne.layers.get_output(self.Qvalue_network)
+        Qvalue_loss = lasagne.objectives.squared_error(target, Qvalue_predict)
+        Qvalue_loss = Qvalue_loss.mean()
+        Qvalue_updates = lasagne.updates.adam(Qvalue_loss, lasagne.layers.get_all_layers(self.Qvalue_network), )
+        Qvalue_update_function = theano.function([state_input_var, action_input_var, target], Qvalue_loss,
+                                                 updates=Qvalue_updates, allow_input_downcast=True)
+        N = state_input_var.shape[0]
+        policy_predict = lasagne.layers.get_output(self.policy_network)
+        dQvalue_a = theano.grad(T.sum(Qvalue_predict), action_input_var)
+        policy_loss = -T.sum(dQvalue_a * policy_predict)/N
+        policy_params = lasagne.layers.get_all_params(self.policy_network)
+        policy_loss = theano.grad(policy_loss, policy_params)
+        policy_updates = lasagne.updates.adam(policy_loss, policy_params)
+        policy_update_function = theano.function([state_input_var, action_input_var], policy_loss,
+                                                 updates=policy_updates, allow_input_downcast=True)
+        return Qvalue_update_function, policy_update_function
 
     def _update_target_network(self, tao):
         original = [self.policy_network, self.Qvalue_network]
@@ -153,14 +170,16 @@ class DDPG(PGRobot):
             lasagne.layers.set_all_param_values(t, new_t_values)
 
     def _build_predict_function(self, network, input_var):
-        prediction = lasagne.layers.get_output(network, allow_input_downcast=True)
-        return theano.function(input_var, prediction)
+        prediction = lasagne.layers.get_output(network)
+        return theano.function(input_var, prediction, allow_input_downcast=True)
 
-    def _build_network(self, input_shape, output_shape, policy_input_var, Qvalue_input_var):
+    def _build_network(self, input_shape, output_shape, state_input_var, action_input_var):
         '''
         :param num_input: the state shape
         :param num_output: the output shape
-        :return: a determine policy network, a value network
+        :param state_input_var: the state variable
+        :param action_input_var: the action var
+        :return: a determine policy network, a value network which input is combines by state and action variable
         '''
         raise Exception('You should implement the _get_network function in the subclass')
 
@@ -195,8 +214,10 @@ class DDPG(PGRobot):
             target_next_action = self.target_policy_predict_function(next_features)
             target = self.gamma * self.target_Qvalue_predict_function(next_features, target_next_action)+\
                      (not done)*rewards
-            Qvalue_loss = lasagne.objectives.squared_error(target, self.Qvalue_predict_function(features, actions))
-            Qvalue_loss = Qvalue_loss.mean()
-            lasagne.updates.adam(Qvalue_loss, lasagne.layers.get_all_layers(self.Qvalue_network),)
+            Qvalue_loss = self.Qvalue_update_function(features, actions, target)
+            action = self.policy_predict_function(features)
+            self.policy_update_function(features, action)
+
+
 
 

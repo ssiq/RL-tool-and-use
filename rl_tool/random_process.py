@@ -9,7 +9,7 @@ class RandomProcess(object):
 
 class NormalMovingAverageProcess(RandomProcess):
     def __init__(self, mu, sigma, M):
-        self.sample_ = lambda x: np.random.multivariate_normal(mu, sigma/M, size=x)
+        self.sample_ = lambda x: np.random.multivariate_normal(mu, sigma, size=x)
         self.prev_M_samples = deque(self.sample_(M))
 
     def sample(self):
