@@ -39,7 +39,7 @@ class Simulator(object):
                 observation, reward, done, info = self.env.step(action)
                 total_reward += reward
                 if done or t == max_episode_length-1:
-                    self.robot.update(observation, done_reward, True)
+                    self.robot.update(observation, reward, True)
                     break
                 else:
                     self.robot.update(observation, reward, done)

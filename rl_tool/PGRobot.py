@@ -134,12 +134,14 @@ class DDPG(PGRobot):
         self.input_shape = input_shape
         self.output_shape = output_shape
         build_predict = lambda x: [(self._build_predict_function(p, self.state_input_var),
-                                   self._build_predict_function(q, self.action_input_var)) for (p, q) in x]
+                                   self._build_predict_function(q, [self.state_input_var, self.action_input_var])) for (p, q) in x]
         (self.policy_predict_function, self.Qvalue_predict_function), \
         (self.target_policy_predict_function, self.target_Qvalue_predict_function) = \
             build_predict([(self.policy_network, self.Qvalue_network), (self.target_policy_network, self.target_Qvalue_network)])
         self.Qvalue_update_function, self.policy_update_function = \
             self._build_grad_function(self.state_input_var, self.action_input_var)
+        self.one_episode_loss = []
+        self.episode_itr = 0
 
     def _build_grad_function(self, state_input_var, action_input_var):
         target = T.matrix('target')
@@ -217,6 +219,11 @@ class DDPG(PGRobot):
             Qvalue_loss = self.Qvalue_update_function(features, actions, target)
             action = self.policy_predict_function(features)
             self.policy_update_function(features, action)
+            self.one_episode_loss.append(Qvalue_loss)
+            if done:
+                print "Episode {} of Qvalue loss {}".format(self.episode_itr, np.mean(Qvalue_loss))
+                self.episode_itr += 1
+                self.one_episode_loss = []
 
 
 
