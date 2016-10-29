@@ -126,15 +126,16 @@ class DDPG(PGRobot):
         self.batch_size = batch_size
         self.gamma = gamma
         self.tao = tao
-        self.state_input_var, self.action_input_var = T.matrices('policy_input', 'action_input')
+        self.state_input_var, self.action_input_var = T.matrices('state_input', 'action_input')
         self.policy_network, self.Qvalue_network = \
             self._build_network(input_shape, output_shape, self.state_input_var, self.action_input_var)
-        self.target_policy_network = copy.deepcopy(self.policy_network)
-        self.target_Qvalue_network = copy.deepcopy(self.Qvalue_network)
+        self.target_policy_network, self.target_Qvalue_network = \
+            self._build_network(input_shape, output_shape, self.state_input_var, self.action_input_var)
+        self._update_target_network(1.0)
         self.input_shape = input_shape
         self.output_shape = output_shape
-        build_predict = lambda x: [(self._build_predict_function(p, self.state_input_var),
-                                   self._build_predict_function(q, [self.state_input_var, self.action_input_var])) for (p, q) in x]
+        build_predict = lambda x: [(self._build_predict_function(p, [self.state_input_var], 'policy'),
+                                   self._build_predict_function(q, [self.state_input_var, self.action_input_var], 'qvalue')) for (p, q) in x]
         (self.policy_predict_function, self.Qvalue_predict_function), \
         (self.target_policy_predict_function, self.target_Qvalue_predict_function) = \
             build_predict([(self.policy_network, self.Qvalue_network), (self.target_policy_network, self.target_Qvalue_network)])
@@ -142,13 +143,14 @@ class DDPG(PGRobot):
             self._build_grad_function(self.state_input_var, self.action_input_var)
         self.one_episode_loss = []
         self.episode_itr = 0
+        self.total_reward = 0.0
 
     def _build_grad_function(self, state_input_var, action_input_var):
         target = T.matrix('target')
         Qvalue_predict = lasagne.layers.get_output(self.Qvalue_network)
         Qvalue_loss = lasagne.objectives.squared_error(target, Qvalue_predict)
         Qvalue_loss = Qvalue_loss.mean()
-        Qvalue_updates = lasagne.updates.adam(Qvalue_loss, lasagne.layers.get_all_layers(self.Qvalue_network), )
+        Qvalue_updates = lasagne.updates.adam(Qvalue_loss, lasagne.layers.get_all_params(self.Qvalue_network), )
         Qvalue_update_function = theano.function([state_input_var, action_input_var, target], Qvalue_loss,
                                                  updates=Qvalue_updates, allow_input_downcast=True)
         N = state_input_var.shape[0]
@@ -171,9 +173,9 @@ class DDPG(PGRobot):
             new_t_values = [tao*ov + (1-tao)*tv for tv, ov in zip(t_values, o_values)]
             lasagne.layers.set_all_param_values(t, new_t_values)
 
-    def _build_predict_function(self, network, input_var):
+    def _build_predict_function(self, network, input_var, name):
         prediction = lasagne.layers.get_output(network)
-        return theano.function(input_var, prediction, allow_input_downcast=True)
+        return theano.function(input_var, prediction, allow_input_downcast=True, name=name)
 
     def _build_network(self, input_shape, output_shape, state_input_var, action_input_var):
         '''
@@ -198,8 +200,8 @@ class DDPG(PGRobot):
         for old_features, action, now_features, reward, done in batch:
             action_list.append(action)
             now_features_list.append(now_features)
-            done_list.append(done)
-            reward_list.append(reward)
+            done_list.append([done])
+            reward_list.append([reward])
             train_X.append(old_features)
         train_X = np.array(train_X)
         action_list = np.array(action_list)
@@ -209,21 +211,28 @@ class DDPG(PGRobot):
         return train_X, action_list, now_features_list, done_list, reward_list
 
     def update(self, observation, reward, done):
-        self.memory.add_sample((self.old_state, self.old_action, observation, reward, done))
+        self.memory.add_sample((self.old_state, self.old_action, observation, reward, done), done)
         batch = self.memory.sample(self.batch_size)
+        self.total_reward += reward
         if batch is not None:
             features, actions, next_features, dones, rewards = self._unpack_batch(batch)
             target_next_action = self.target_policy_predict_function(next_features)
+            # print self.target_Qvalue_predict_function(next_features, target_next_action).shape
             target = self.gamma * self.target_Qvalue_predict_function(next_features, target_next_action)+\
                      (not done)*rewards
+            # print target
+            # print target.shape
             Qvalue_loss = self.Qvalue_update_function(features, actions, target)
             action = self.policy_predict_function(features)
             self.policy_update_function(features, action)
             self.one_episode_loss.append(Qvalue_loss)
+            self._update_target_network(self.tao)
             if done:
-                print "Episode {} of Qvalue loss {}".format(self.episode_itr, np.mean(Qvalue_loss))
+                print "Episode {} of Qvalue loss {} and reward {}".format(self.episode_itr, np.mean(Qvalue_loss),
+                                                                          self.total_reward)
                 self.episode_itr += 1
                 self.one_episode_loss = []
+                self.total_reward = 0.0
 
 
 
