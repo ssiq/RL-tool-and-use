@@ -118,7 +118,7 @@ class ContinuousMonteCarloPGRobot(MonteCarloPGRobot):
 
 
 class DDPG(PGRobot):
-    def __init__(self, input_shape, output_shape, random_process, memory, batch_size=32, gamma=0.99, tao=0.001, ):
+    def __init__(self, input_shape, output_shape, random_process, memory, batch_size=64, gamma=0.99, tao=0.001, ):
         super(DDPG, self).__init__()
         self.random_process = random_process
         self.memory = memory
@@ -150,7 +150,8 @@ class DDPG(PGRobot):
         Qvalue_predict = lasagne.layers.get_output(self.Qvalue_network)
         Qvalue_loss = lasagne.objectives.squared_error(target, Qvalue_predict)
         Qvalue_loss = Qvalue_loss.mean()
-        Qvalue_updates = lasagne.updates.adam(Qvalue_loss, lasagne.layers.get_all_params(self.Qvalue_network), )
+        Qvalue_updates = lasagne.updates.adam(Qvalue_loss, lasagne.layers.get_all_params(self.Qvalue_network),
+                                              learning_rate=1e-4)
         Qvalue_update_function = theano.function([state_input_var, action_input_var, target], Qvalue_loss,
                                                  updates=Qvalue_updates, allow_input_downcast=True)
         N = state_input_var.shape[0]
@@ -159,7 +160,7 @@ class DDPG(PGRobot):
         policy_loss = -T.sum(dQvalue_a * policy_predict)/N
         policy_params = lasagne.layers.get_all_params(self.policy_network)
         policy_loss = theano.grad(policy_loss, policy_params)
-        policy_updates = lasagne.updates.adam(policy_loss, policy_params)
+        policy_updates = lasagne.updates.adam(policy_loss, policy_params, learning_rate=1e-3)
         policy_update_function = theano.function([state_input_var, action_input_var], policy_loss,
                                                  updates=policy_updates, allow_input_downcast=True)
         return Qvalue_update_function, policy_update_function
@@ -170,7 +171,7 @@ class DDPG(PGRobot):
         for o, t in zip(original, target):
             t_values = lasagne.layers.get_all_param_values(t)
             o_values = lasagne.layers.get_all_param_values(o)
-            new_t_values = [tao*ov + (1-tao)*tv for tv, ov in zip(t_values, o_values)]
+            new_t_values = [tao*ov + (1.0-tao)*tv for tv, ov in zip(t_values, o_values)]
             lasagne.layers.set_all_param_values(t, new_t_values)
 
     def _build_predict_function(self, network, input_var, name):
@@ -217,18 +218,16 @@ class DDPG(PGRobot):
         if batch is not None:
             features, actions, next_features, dones, rewards = self._unpack_batch(batch)
             target_next_action = self.target_policy_predict_function(next_features)
-            # print self.target_Qvalue_predict_function(next_features, target_next_action).shape
             target = self.gamma * self.target_Qvalue_predict_function(next_features, target_next_action)+\
                      (not done)*rewards
-            # print target
-            # print target.shape
             Qvalue_loss = self.Qvalue_update_function(features, actions, target)
             action = self.policy_predict_function(features)
             self.policy_update_function(features, action)
             self.one_episode_loss.append(Qvalue_loss)
             self._update_target_network(self.tao)
             if done:
-                print "Episode {} of Qvalue loss {} and reward {}".format(self.episode_itr, np.mean(Qvalue_loss),
+                print "Episode {} of Qvalue loss {} and reward {}".format(self.episode_itr,
+                                                                          np.mean(self.one_episode_loss),
                                                                           self.total_reward)
                 self.episode_itr += 1
                 self.one_episode_loss = []
