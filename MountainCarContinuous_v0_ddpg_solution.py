@@ -21,13 +21,14 @@ class SubDDPG(DDPG):
 
         Qvalue_network = lasagne.layers.InputLayer(shape=(None, np.cumprod(input_shape)[-1]), input_var=state_input_var,
                                                    name='Qvalue')
+        state_intput_layer = Qvalue_network
         Qvalue_network = lasagne.layers.DenseLayer(Qvalue_network, num_units=400, W=lasagne.init.HeUniform())
         Qvalue_action_input_layer = lasagne.layers.InputLayer(shape=(None, np.cumprod(output_shape)[-1]),
                                                               input_var=action_input_var)
         Qvalue_network = lasagne.layers.ConcatLayer([Qvalue_network, Qvalue_action_input_layer], axis=1)
         Qvalue_network = lasagne.layers.DenseLayer(Qvalue_network, num_units=300, W=lasagne.init.HeUniform())
         Qvalue_network = lasagne.layers.DenseLayer(Qvalue_network, num_units=1, W=lasagne.init.Uniform(3e-4))
-        return policy_network, Qvalue_network
+        return policy_network, Qvalue_network, Qvalue_action_input_layer, state_intput_layer
 
 
 if __name__ == '__main__':

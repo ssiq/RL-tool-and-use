@@ -5,6 +5,9 @@ import theano
 import theano.tensor as T
 import copy
 
+from DeterminePolicyNetwork import DeterminePolicyNetwork
+from ContinousQValueNetwork import ContinousQValueNetwork
+
 
 class PGRobot(Robot):
     def __init__(self):
@@ -118,79 +121,65 @@ class ContinuousMonteCarloPGRobot(MonteCarloPGRobot):
 
 
 class DDPG(PGRobot):
-    def __init__(self, input_shape, output_shape, random_process, memory, batch_size=64, gamma=0.99, tao=0.001, ):
+    def __init__(self, policy_network, q_value_network, random_process, memory, policy_update_method,
+                 q_value_update_method, q_value_weight_decay=1e-4, policy_weight_decay=1e-4, batch_size=64, gamma=0.99, tao=0.001, ):
         super(DDPG, self).__init__()
+        if not isinstance(policy_network, DeterminePolicyNetwork):
+            raise ValueError('The policy network for ddpg should be the DeterminePolicyNetwork')
+        if not isinstance(q_value_network, ContinousQValueNetwork):
+            raise ValueError('The q value network for ddpg should be the ContinousQValueNetwork')
         self.random_process = random_process
         self.memory = memory
         self.old_state = None
+        self.policy_update_method = policy_update_method
+        self.q_value_update_method = q_value_update_method
+        self.q_value_weight_decay = q_value_weight_decay
+        self.policy_weight_decay = policy_weight_decay
         self.batch_size = batch_size
         self.gamma = gamma
         self.tao = tao
-        self.state_input_var, self.action_input_var = T.matrices('state_input', 'action_input')
-        self.policy_network, self.Qvalue_network = \
-            self._build_network(input_shape, output_shape, self.state_input_var, self.action_input_var)
-        self.target_policy_network, self.target_Qvalue_network = \
-            self._build_network(input_shape, output_shape, self.state_input_var, self.action_input_var)
-        self._update_target_network(1.0)
-        self.input_shape = input_shape
-        self.output_shape = output_shape
-        build_predict = lambda x: [(self._build_predict_function(p, [self.state_input_var], 'policy'),
-                                   self._build_predict_function(q, [self.state_input_var, self.action_input_var], 'qvalue')) for (p, q) in x]
-        (self.policy_predict_function, self.Qvalue_predict_function), \
-        (self.target_policy_predict_function, self.target_Qvalue_predict_function) = \
-            build_predict([(self.policy_network, self.Qvalue_network), (self.target_policy_network, self.target_Qvalue_network)])
-        self.Qvalue_update_function, self.policy_update_function = \
-            self._build_grad_function(self.state_input_var, self.action_input_var)
+        self.policy_network = policy_network
+        self.q_value_network = q_value_network
+        self.target_policy_network = copy.deepcopy(policy_network)
+        self.target_q_value_network = copy.deepcopy(q_value_network)
         self.one_episode_loss = []
         self.episode_itr = 0
         self.total_reward = 0.0
+        self.time_steps = 0
+        self.reward_history = []
+        self.q_value_update_function, self.policy_update_function = \
+            self._build_grad_function()
 
-    def _build_grad_function(self, state_input_var, action_input_var):
-        target = T.matrix('target')
-        Qvalue_predict = lasagne.layers.get_output(self.Qvalue_network)
-        Qvalue_loss = lasagne.objectives.squared_error(target, Qvalue_predict)
-        Qvalue_loss = Qvalue_loss.mean()
-        Qvalue_updates = lasagne.updates.adam(Qvalue_loss, lasagne.layers.get_all_params(self.Qvalue_network),
-                                              learning_rate=1e-4)
-        Qvalue_update_function = theano.function([state_input_var, action_input_var, target], Qvalue_loss,
-                                                 updates=Qvalue_updates, allow_input_downcast=True)
-        N = state_input_var.shape[0]
-        policy_predict = lasagne.layers.get_output(self.policy_network)
-        dQvalue_a = theano.grad(T.sum(Qvalue_predict), action_input_var)
-        policy_loss = -T.sum(dQvalue_a * policy_predict)/N
-        policy_params = lasagne.layers.get_all_params(self.policy_network)
-        policy_loss = theano.grad(policy_loss, policy_params)
-        policy_updates = lasagne.updates.adam(policy_loss, policy_params, learning_rate=1e-3)
-        policy_update_function = theano.function([state_input_var, action_input_var], policy_loss,
-                                                 updates=policy_updates, allow_input_downcast=True)
-        return Qvalue_update_function, policy_update_function
+    def _build_grad_function(self):
+        target, ob, action = T.matrices('target', 'ob', 'action')
+        q_value = self.q_value_network.get_symbol_output(ob, action, deterministic=True)
+        q_value_loss = lasagne.objectives.squared_error(target, q_value) \
+                       + self.q_value_weight_decay * \
+                         self.q_value_network.regularize_network_params(lasagne.regularization.l2)
+        q_value_updates = self.q_value_update_method(q_value_loss, self.q_value_network.get_params(trainable=True))
+        q_value_update_function = theano.function([ob, action, target],
+                                                  q_value_loss, updates=q_value_updates, allow_input_downcast=True)
+
+        p_action = self.policy_network.get_symbol_output(ob)
+        p_q_value = self.q_value_network.get_symbol_output(ob, p_action, deterministic=True)
+        p_loss = -T.mean(p_q_value) + self.policy_weight_decay * \
+                                      self.policy_network.regularize_network_params(lasagne.regularization.l2)
+        p_updates = self.policy_update_method(p_loss, self.policy_network.get_params(trainable=True))
+        p_update_function = theano.function([ob], p_loss, updates=p_updates, allow_input_downcast=True)
+        return q_value_update_function, p_update_function
 
     def _update_target_network(self, tao):
-        original = [self.policy_network, self.Qvalue_network]
-        target = [self.target_policy_network, self.target_Qvalue_network]
+        original = [self.policy_network, self.q_value_network]
+        target = [self.target_policy_network, self.target_q_value_network]
         for o, t in zip(original, target):
-            t_values = lasagne.layers.get_all_param_values(t)
-            o_values = lasagne.layers.get_all_param_values(o)
+            t_values = t.get_all_param_values()
+            o_values = o.get_all_param_values()
             new_t_values = [tao*ov + (1.0-tao)*tv for tv, ov in zip(t_values, o_values)]
-            lasagne.layers.set_all_param_values(t, new_t_values)
-
-    def _build_predict_function(self, network, input_var, name):
-        prediction = lasagne.layers.get_output(network)
-        return theano.function(input_var, prediction, allow_input_downcast=True, name=name)
-
-    def _build_network(self, input_shape, output_shape, state_input_var, action_input_var):
-        '''
-        :param num_input: the state shape
-        :param num_output: the output shape
-        :param state_input_var: the state variable
-        :param action_input_var: the action var
-        :return: a determine policy network, a value network which input is combines by state and action variable
-        '''
-        raise Exception('You should implement the _get_network function in the subclass')
+            t.set_all_param_values(new_t_values)
 
     def _predict(self, observation):
         self.old_state = observation
-        return self.policy_predict_function(np.array([observation]))[0] + self.random_process.sample()
+        return self.policy_network.get_action(np.array([observation])) + self.random_process.sample()
 
     def _unpack_batch(self, batch):
         train_X = []
@@ -215,23 +204,29 @@ class DDPG(PGRobot):
         self.memory.add_sample((self.old_state, self.old_action, observation, reward, done), done)
         batch = self.memory.sample(self.batch_size)
         self.total_reward += reward
+        self.time_steps += 1
         if batch is not None:
             features, actions, next_features, dones, rewards = self._unpack_batch(batch)
-            target_next_action = self.target_policy_predict_function(next_features)
-            target = self.gamma * self.target_Qvalue_predict_function(next_features, target_next_action)+\
-                     (not done)*rewards
-            Qvalue_loss = self.Qvalue_update_function(features, actions, target)
-            action = self.policy_predict_function(features)
+            target_next_action = self.target_policy_network.get_output(next_features)
+            target = (not done) * self.gamma * self.target_q_value_network.get_output(next_features, target_next_action)\
+                     + rewards
+            Qvalue_loss = self.q_value_update_function(features, actions, target)
+            action = self.policy_update_function(features)
             self.policy_update_function(features, action)
             self.one_episode_loss.append(Qvalue_loss)
             self._update_target_network(self.tao)
             if done:
-                print "Episode {} of Qvalue loss {} and reward {}".format(self.episode_itr,
-                                                                          np.mean(self.one_episode_loss),
-                                                                          self.total_reward)
+                self.reward_history.append(self.total_reward)
+                print "Episode {} of Qvalue loss {}, reward {}, time steps {} and last 100 mean reward {}"\
+                    .format(self.episode_itr,
+                            np.mean(self.one_episode_loss),
+                            self.total_reward,
+                            self.time_steps,
+                            np.mean(self.reward_history[-100:]))
                 self.episode_itr += 1
                 self.one_episode_loss = []
                 self.total_reward = 0.0
+                self.time_steps = 0
 
 
 
