@@ -67,9 +67,22 @@ class MlpDeterminePolicyNetwork(DeterminePolicyNetwork):
     def _build_network(self):
         input_layer = lasagne.layers.InputLayer(shape=(None, self.input_shape))
         network = input_layer
+        i = 0
         for size in self.hidden_sizes:
+            i += 1
             network = lasagne.layers.DenseLayer(network,
                                                 num_units=size,
                                                 W=self.hidden_W_init,
                                                 b=self.hidden_b_init,
-                                                nonlinearity=self.hidden_nonlinearity)
+                                                nonlinearity=self.hidden_nonlinearity,
+                                                name='hidden_{}_layer'.format(i))
+            if self.bn:
+                network = lasagne.layers.batch_norm(network)
+
+        network = lasagne.layers.DenseLayer(network,
+                                            num_units=self.output_shape,
+                                            W=self.output_W_init,
+                                            b=self.output_b_init,
+                                            nonlinearity=self.output_nonlinearity,
+                                            name='output_layer')
+        return network, input_layer
