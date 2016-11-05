@@ -28,6 +28,7 @@ class Simulator(object):
         return self
 
     def run(self, episode_number=20, max_episode_length=100, render_per_iterations=100, done_reward=-1):
+        is_end = False
         for i_episode in xrange(episode_number):
             observation = self.env.reset()
             self.robot.reset()
@@ -38,9 +39,13 @@ class Simulator(object):
                 action = self.robot.response(observation)
                 observation, reward, done, info = self.env.step(action)
                 total_reward += reward
-                if done or t == max_episode_length-1:
-                    self.robot.update(observation, reward, True)
+                if t == max_episode_length-1:
+                    done = True
+                r = self.robot.update(observation, reward, done)
+                if r is not None and r == False:
+                    is_end = True
+                if done:
                     break
-                else:
-                    self.robot.update(observation, reward, done)
+            # if is_end:
+            #     return False
 

@@ -3,19 +3,18 @@ from collections import deque
 
 
 class RandomProcess(object):
-    def sample(self):
+    '''
+    The class is created to explore in the determine policy gradient
+    '''
+    def sample(self, t):
         pass
 
 
-class NormalMovingAverageProcess(RandomProcess):
-    def __init__(self, mu, sigma, M, out_shape):
-        self.sample_ = lambda x: np.random.multivariate_normal(mu, sigma, size=x)
-        self.prev_M_samples = deque(self.sample_(M))
-        self.out_shape = out_shape
+class GuassianRandomProcess(RandomProcess):
+    def __init__(self, min_sigma=0.1, max_sigma=1, decay_period=10000, out_shape=4):
+        self.min_sigma, self.max_sigma, self.decay_period, self.out_shape = \
+            min_sigma, max_sigma, decay_period, out_shape
 
-    def sample(self):
-        r = np.mean(self.prev_M_samples, axis=0)
-        r = np.reshape(r, self.out_shape)
-        self.prev_M_samples.popleft()
-        self.prev_M_samples.append(self.sample_(1))
-        return r
+    def sample(self, t):
+        sigma = self.max_sigma - (self.max_sigma - self.min_sigma) * min(1, t)/self.decay_period
+        return np.random.normal(size=self.out_shape) * sigma

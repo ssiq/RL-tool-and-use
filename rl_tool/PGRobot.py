@@ -3,6 +3,7 @@ import numpy as np
 import lasagne
 import theano
 import theano.tensor as T
+import gym
 import copy
 
 from DeterminePolicyNetwork import DeterminePolicyNetwork
@@ -121,8 +122,19 @@ class ContinuousMonteCarloPGRobot(MonteCarloPGRobot):
 
 
 class DDPG(PGRobot):
-    def __init__(self, policy_network, q_value_network, random_process, memory, policy_update_method,
-                 q_value_update_method, q_value_weight_decay=1e-4, policy_weight_decay=1e-4, batch_size=64, gamma=0.99, tao=0.001, ):
+    def __init__(self,
+                 policy_network,
+                 q_value_network,
+                 random_process,
+                 memory,
+                 policy_update_method,
+                 q_value_update_method,
+                 action_space,
+                 q_value_weight_decay=1e-4,
+                 policy_weight_decay=1e-4,
+                 batch_size=64,
+                 gamma=0.99,
+                 tao=0.001, ):
         super(DDPG, self).__init__()
         if not isinstance(policy_network, DeterminePolicyNetwork):
             raise ValueError('The policy network for ddpg should be the DeterminePolicyNetwork')
@@ -135,6 +147,7 @@ class DDPG(PGRobot):
         self.q_value_update_method = q_value_update_method
         self.q_value_weight_decay = q_value_weight_decay
         self.policy_weight_decay = policy_weight_decay
+        self.action_space = action_space
         self.batch_size = batch_size
         self.gamma = gamma
         self.tao = tao
@@ -146,14 +159,13 @@ class DDPG(PGRobot):
         self.episode_itr = 0
         self.total_reward = 0.0
         self.time_steps = 0
-        self.reward_history = []
         self.q_value_update_function, self.policy_update_function = \
             self._build_grad_function()
 
     def _build_grad_function(self):
         target, ob, action = T.matrices('target', 'ob', 'action')
         q_value = self.q_value_network.get_symbol_output(ob, action, deterministic=True)
-        q_value_loss = lasagne.objectives.squared_error(target, q_value) \
+        q_value_loss = lasagne.objectives.squared_error(target, q_value).mean() \
                        + self.q_value_weight_decay * \
                          self.q_value_network.regularize_network_params(lasagne.regularization.l2)
         q_value_updates = self.q_value_update_method(q_value_loss, self.q_value_network.get_params(trainable=True))
@@ -179,7 +191,10 @@ class DDPG(PGRobot):
 
     def _predict(self, observation):
         self.old_state = observation
-        return self.policy_network.get_action(np.array([observation])) + self.random_process.sample()
+        return np.clip(self.policy_network.get_action(np.array([observation])) +
+                       self.random_process.sample(self.episode_itr),
+                       self.action_space.low,
+                       self.action_space.high)
 
     def _unpack_batch(self, batch):
         train_X = []
@@ -211,18 +226,19 @@ class DDPG(PGRobot):
             target = (not done) * self.gamma * self.target_q_value_network.get_output(next_features, target_next_action)\
                      + rewards
             Qvalue_loss = self.q_value_update_function(features, actions, target)
-            action = self.policy_update_function(features)
-            self.policy_update_function(features, action)
+            if np.isinf(Qvalue_loss) or np.isnan(Qvalue_loss):
+                return False
+            self.policy_update_function(features)
             self.one_episode_loss.append(Qvalue_loss)
             self._update_target_network(self.tao)
             if done:
-                self.reward_history.append(self.total_reward)
+                self._add_reward(self.total_reward)
                 print "Episode {} of Qvalue loss {}, reward {}, time steps {} and last 100 mean reward {}"\
                     .format(self.episode_itr,
                             np.mean(self.one_episode_loss),
                             self.total_reward,
                             self.time_steps,
-                            np.mean(self.reward_history[-100:]))
+                            self._get_mean_reward())
                 self.episode_itr += 1
                 self.one_episode_loss = []
                 self.total_reward = 0.0

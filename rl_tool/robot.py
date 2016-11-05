@@ -1,11 +1,21 @@
 from feature import IdentityFeatureExtractor
 from utility import flip_coin
 import random
+import numpy as np
 
 
 class Robot(object):
     def __init__(self):
-        pass
+        self.reward_history = []
+
+    def _add_reward(self, reward):
+        self.reward_history.append(reward)
+
+    def _get_mean_reward(self):
+        return np.mean(self.reward_history[-100:])
+
+    def get_mean_reward(self):
+        return self._get_mean_reward()
 
     def response(self, observation):
         pass
