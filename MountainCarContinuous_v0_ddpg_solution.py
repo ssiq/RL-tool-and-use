@@ -5,7 +5,7 @@ import theano
 
 from rl_tool.simulator import Simulator
 from rl_tool.PGRobot import DDPG
-from rl_tool.random_process import GuassianRandomProcess
+from rl_tool.random_process import GuassianRandomProcess, OURandomProcess
 from rl_tool.replay_memory import NormalMemory
 from rl_tool.DeterminePolicyNetwork import MlpDeterminePolicyNetwork
 from rl_tool.ContinousQValueNetwork import MlpContinousQValueNetwork
@@ -16,14 +16,15 @@ if __name__ == '__main__':
     input_number = (2, )
     action_number = (1, )
 
-    process = GuassianRandomProcess(max_sigma=1, decay_period=800, out_shape=action_number[0])
+    # process = GuassianRandomProcess(max_sigma=1, decay_period=800, out_shape=action_number[0])
+    process = OURandomProcess(out_shape=action_number[0])
     policy_network = MlpDeterminePolicyNetwork(input_shape=input_number[0],
                                                output_shape=action_number[0],
-                                               hidden_sizes=(32, 100, 32),
+                                               hidden_sizes=(32, 32),
                                                bn=True)
     q_value_network = MlpContinousQValueNetwork(input_shape=input_number[0],
                                                 action_shape=action_number[0],
-                                                hidden_sizes=(32, 100, 32),
+                                                hidden_sizes=(32, 32),
                                                 bn=True,
                                                 action_merge_layer=1)
     replay_memory = NormalMemory(100, 100000)
