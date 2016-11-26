@@ -28,14 +28,19 @@ if __name__ == '__main__':
                                                 bn=True,
                                                 action_merge_layer=1)
     replay_memory = NormalMemory(100, 100000)
-    policy_update_method = lambda loss, params: lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=5e-3)
-    q_value_update_method = lambda loss, params: lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=5e-3)
+    policy_update_method = lambda loss, params: lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=1e-3)
+    q_value_update_method = lambda loss, params: lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=1e-3)
     robot = DDPG(policy_network=policy_network,
                  q_value_network=q_value_network,
                  random_process=process,
                  memory=replay_memory,
                  policy_update_method=policy_update_method,
                  q_value_update_method=q_value_update_method,
-                 action_space=env.action_space)
+                 action_space=env.action_space,
+                 batch_size=32,
+                 q_value_weight_decay=0.0,
+                 policy_weight_decay=0.0)
     simulator = Simulator(env, robot, verbose=True)
+    env.monitor.start('/tmp/cartpole-experiment-1')
     simulator.run(episode_number=1200, max_episode_length=env.spec.timestep_limit, render_per_iterations=10)
+    env.monitor.close()
